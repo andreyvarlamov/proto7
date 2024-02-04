@@ -1,0 +1,42 @@
+{
+    "build_systems":
+    [
+        {
+            "name": "Build (project)",
+            "shell_cmd": "pushd $project_path & set CurrProjDir=$project_path & build & popd",
+            "file_regex": "^\\s*(\\S*)\\((\\d+)\\):\\s()(.*)",
+            "variants":
+            [
+                {
+                    "name": "Build and run",
+                    "shell_cmd": "pushd $project_path & set CurrProjDir=$project_path & build & set path=dlls;%path% & for %i in (build\\*.exe) do %i & popd",
+                },
+                {
+                    "name": "Start VS",
+                    "shell_cmd": "devenv $project_path\\build\\vs_debug\\proto7.sln",
+                },
+                {
+                    "name": "Run",
+                    "shell_cmd": "pushd $project_path & set path=dlls;%path% & for %i in (build\\*.exe) do %i & popd"
+                },
+                {
+                    "name": "Run (separate cmd)",
+                    "shell_cmd": "pushd $project_path & set path=dlls;%path% & for %i in (build\\*.exe) do start %i & popd"
+                },
+                {
+                    "name": "Debug in new VS instance",
+                    "shell_cmd": "pushd $project_path & set CurrProjDir=$project_path & build & popd & devenv /runexit $project_path\\build\\vs_debug\\proto7.sln",
+                }
+            ],
+        }
+    ],
+    "folders":
+    [
+		{
+			"path": ".",
+		},
+        {
+			"path": "C:\\dev\\shared\\include\\varand"
+		},
+    ],
+}
