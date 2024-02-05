@@ -27,4 +27,8 @@ cl %SourceDir%\proto7.cpp %CompilerOptions% %CompilerWarningOptions% /link %Link
 
 popd
 
+if %ERRORLEVEL% NEQ 0 (
+    exit %ERRORLEVEL%
+)
+
 ENDLOCAL

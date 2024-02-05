@@ -5,9 +5,6 @@
 #include <raylib/raylib.h>
 #include <raylib/raymath.h>
 
-#define JC_VORONOI_IMPLEMENTATION
-#include <misc/jc_voronoi.h>
-
 #include <varand/varand_util.h>
 
 struct FontAtlas
@@ -33,86 +30,25 @@ void DrawGlyph(Rectangle destRect, int glyphIndex, Color color)
     DrawTexturePro(gFontAtlas.texture, sourceRect, destRect, GetVector2(), 0, color);
 }
 
-#define VORONOI_SITE_COUNT 1000
+#define MAP_WIDTH 24
+#define MAP_HEIGHT 24
 
-global_variable jcv_rect gBoundingBox;
-
-void RelaxVoronoiPoints(jcv_point *points, int pointCount)
+struct GameState
 {
-    jcv_diagram diagram = {};
-    jcv_diagram_generate(pointCount, points, &gBoundingBox, 0, &diagram);
-
-    jcv_site* sites = (jcv_site *) jcv_diagram_get_sites(&diagram);
-
-    for(int i = 0; i < diagram.numsites; i++)
-    {
-        jcv_site* site = &sites[i];
-        jcv_point sum = site->p;
-        int count = 1;
-
-        jcv_graphedge* edge = site->edges;
-        while(edge)
-        {
-            sum.x += edge->pos[0].x;
-            sum.y += edge->pos[0].y;
-            count++;
-            edge = edge->next;
-        }
-
-        points[site->index].x = sum.x / (jcv_real)count;
-        points[site->index].y = sum.y / (jcv_real)count;
-    }
-
-    jcv_diagram_free(&diagram);
-}
-
-struct GroundSamplingPoint
-{
-    f32 x;
-    f32 y;
-    f32 area;
-    int variant;
-    f32 rotation;
-    Color color;
+    int playerX;
+    int playerY;
 };
 
-void GetGroundSamplingPoints(jcv_point *points, int pointCount,
-                             GroundSamplingPoint *groundSamplingPoints)
+struct GroundPoint
 {
-    jcv_diagram diagram = {};
-    jcv_diagram_generate(pointCount, points, &gBoundingBox, 0, &diagram);
+    Vector2 pxPos;
 
-    jcv_site* sites = (jcv_site *) jcv_diagram_get_sites(&diagram);
+    f32 scale;
 
-    for(int i = 0; i < diagram.numsites; i++)
-    {
-        jcv_site* site = &sites[i];
-        jcv_point sum = site->p;
-        int count = 1;
+    int variant;
 
-        jcv_point a = points[site->index];
-
-        jcv_graphedge* edge = site->edges;
-
-        f32 siteArea = 0;
-
-        while(edge)
-        {
-            jcv_point b = edge->pos[0];
-            jcv_point c = edge->pos[1];
-
-            siteArea += AbsF(a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y)) * 0.5f;
-
-            edge = edge->next;
-        }
-
-        groundSamplingPoints[site->index].x = a.x;
-        groundSamplingPoints[site->index].y = a.y;
-        groundSamplingPoints[site->index].area = siteArea;
-    }
-
-    jcv_diagram_free(&diagram);
-}
+    f32 rotation;
+};
 
 int main(void)
 {
@@ -120,6 +56,12 @@ int main(void)
     int screenHeight = 1080;
 
     InitWindow(screenWidth, screenHeight, "Initial window");
+
+    InitAudioDevice();
+
+    Music music = LoadMusicStream("resources/20240204 Calling.mp3");
+
+    PlayMusicStream(music);
 
     gFontAtlas.texture = LoadTexture("resources/bloody_font.png");
     gFontAtlas.glyphWidth = 48;
@@ -132,102 +74,223 @@ int main(void)
     int glyphsPerColumnOnScreen = (int) (screenHeight / destRect.height);
 
     Texture2D groundTexture = LoadTexture("resources/GroundBrushes2.png");
+    int groundBrushVariants = 4;
     SetTextureFilter(groundTexture, TEXTURE_FILTER_POINT);
     Rectangle groundSourceRect = GetRectangle(64, 64);
 
-    jcv_point points[VORONOI_SITE_COUNT];
-    for (int i = 0; i < ArrayCount(points); i++)
+    Texture2D wallTexture = LoadTexture("resources/small wall.png");
+    SetTextureFilter(groundTexture, TEXTURE_FILTER_POINT);
+    Rectangle wallSourceRect = GetRectangle(24, 36);
+
+    Font font = LoadFontEx("resources/LuxuriousRoman-Regular.ttf", 30, 0, 100);
+
+    GameState gameStateData = {};
+    GameState *gameState = &gameStateData;
+
+    int mapWidth = MAP_WIDTH;
+    int mapHeight = MAP_HEIGHT;
+    u8 mapGlyphs[MAP_WIDTH * MAP_HEIGHT];
+    for (int i = 0; i < ArrayCount(mapGlyphs); i++)
     {
-        points[i].x = (f32) GetRandomValue(0, screenWidth - 1);
-        points[i].y = (f32) GetRandomValue(0, screenHeight - 1);
+        int x = i % mapWidth;
+        int y = i / mapWidth;
+
+        b32 isWall = (x == 0 || x == mapWidth - 1 ||
+                      y == 0 || y == mapHeight - 1);
+
+        mapGlyphs[i] = isWall ? '#' : '.';
     }
-    int relaxIterations = 15;
-    for (int i = 0; i < relaxIterations; i++)
+
+    int enemyHealths[MAP_WIDTH * MAP_HEIGHT] = {};
+    for (int i = 0; i < ArrayCount(mapGlyphs); i++)
     {
-        RelaxVoronoiPoints(points, ArrayCount(points));
+        if (GetRandomValue(0,100) < 5)
+        {
+            enemyHealths[i] = 10;
+        }
     }
-    jcv_diagram diagram = {};
-    gBoundingBox = { { 0.0f, 0.0f }, { (f32) screenWidth, (f32) screenHeight } };
-    jcv_diagram_generate(ArrayCount(points), points, &gBoundingBox, 0, &diagram);
-    GroundSamplingPoint groundSamplingPoints[VORONOI_SITE_COUNT] = {};
-    GetGroundSamplingPoints(points, ArrayCount(points), groundSamplingPoints);
-    
-    for (int i = 0; i < ArrayCount(groundSamplingPoints); i++)
+
+    Color testColors[MAP_WIDTH * MAP_HEIGHT];
+    for (int i = 0; i < ArrayCount(mapGlyphs); i++)
     {
-        groundSamplingPoints[i].variant = GetRandomValue(0, 3);
-        groundSamplingPoints[i].rotation = GetRandomValue(0, 5000) / 1000.0f;
-        groundSamplingPoints[i].color = GetColor(GetRandomValue(0,255) << 24 | 
-                                                 GetRandomValue(0,255) << 16 |
-                                                 GetRandomValue(0,255) << 8 |
-                                                 255);
+        testColors[i] = GetColor(GetRandomValue(0,255), GetRandomValue(0,255), GetRandomValue(0,255));
     }
+
+    GroundPoint groundPoints[MAP_WIDTH * MAP_HEIGHT];
+    for (int i = 0; i < ArrayCount(mapGlyphs); i++)
+    {
+        GroundPoint *point = groundPoints + i;
+
+        point->variant = GetRandomValue(0, groundBrushVariants - 1);
+        point->scale = 1.0f + GetRandomValue(0, 255) / 1024.0f;
+
+        int x = i % mapWidth;
+        int y = i / mapWidth;
+
+        f32 xPx = (f32) x * gFontAtlas.glyphWidth + gFontAtlas.glyphWidth / 2.0f;
+        f32 yPx = (f32) y * gFontAtlas.glyphHeight + gFontAtlas.glyphHeight / 2.0f;
+
+        f32 offsetXPct = GetRandomValue(0, 1000) / 10000.0f - 0.05f; // [-0.05, 0.05]
+        f32 offsetYPct = GetRandomValue(0, 1000) / 10000.0f - 0.05f;
+
+        xPx += offsetXPct * gFontAtlas.glyphWidth;
+        yPx += offsetYPct * gFontAtlas.glyphHeight;
+
+        point->pxPos = GetVector2(xPx, yPx);
+
+        point->rotation = (f32) GetRandomValue(0, 359);
+    }
+
+    gameState->playerX = 1;
+    gameState->playerY = 1;
+
+    Camera2D camera = {};
+    camera.target = GetVector2(gameState->playerX * gFontAtlas.glyphWidth + gFontAtlas.glyphWidth / 2.0f,
+                               gameState->playerY * gFontAtlas.glyphHeight + gFontAtlas.glyphHeight / 2.0f);
+    camera.offset = GetVector2(screenWidth / 2.0f, screenHeight / 2.0f);
+    camera.rotation = 0.0f;
+    camera.zoom = 1.0f;
+
+    Matrix matrix = GetCameraMatrix2D(camera);
 
     SetTargetFPS(60);
 	
     while (!WindowShouldClose())
     {
         // Update
+        UpdateMusicStream(music);
+
+        int playerDesiredX = gameState->playerX;
+        int playerDesiredY = gameState->playerY;
+
+        if (IsKeyPressed(KEY_D) || IsKeyPressedRepeat(KEY_D))
+        {
+            playerDesiredX++;
+        }
+
+        if (IsKeyPressed(KEY_A) || IsKeyPressedRepeat(KEY_A))
+        {
+            playerDesiredX--;
+        }
+
+        if (IsKeyPressed(KEY_W) || IsKeyPressedRepeat(KEY_W))
+        {
+            playerDesiredY--;
+        }
+
+        if (IsKeyPressed(KEY_S) || IsKeyPressedRepeat(KEY_S))
+        {
+            playerDesiredY++;
+        }
+
+        if (enemyHealths[playerDesiredY * mapWidth + playerDesiredX] > 0)
+        {
+            enemyHealths[playerDesiredY * mapWidth + playerDesiredX] -= 4;
+        }
+        else if (mapGlyphs[playerDesiredY * mapWidth + playerDesiredX] != '#')
+        {
+            gameState->playerX = playerDesiredX;
+            gameState->playerY = playerDesiredY;
+            camera.target = GetVector2(gameState->playerX * gFontAtlas.glyphWidth + gFontAtlas.glyphWidth / 2.0f,
+                                       gameState->playerY * gFontAtlas.glyphHeight + gFontAtlas.glyphHeight / 2.0f);
+        }
 
         // Draw
         BeginDrawing();
             ClearBackground(BLACK);
 
-            // Draw texture quads
-            for (int i = 0; i < ArrayCount(groundSamplingPoints); i++)
+            BeginMode2D(camera);
+
+                for (int i = 0; i < ArrayCount(mapGlyphs); i++)
+                {
+                    int x = i % mapWidth;
+                    int y = i / mapWidth;
+
+                    int wPx = gFontAtlas.glyphWidth;
+                    int hPx = gFontAtlas.glyphHeight;
+                    int xPx = x * wPx;
+                    int yPx = y * hPx;
+
+                    // DrawRectangle(xPx, yPx, wPx, hPx, testColors[i]);
+                    
+                    GroundPoint *point = groundPoints + i;
+                    groundSourceRect.y = point->variant * groundSourceRect.height;
+                    f32 baseScale = 5.0f;
+                    f32 sWidth = groundSourceRect.width * baseScale * point->scale;
+                    f32 sHeight = groundSourceRect.height * baseScale * point->scale;
+                    Rectangle groundDistRect = GetRectangle(point->pxPos.x, point->pxPos.y, sWidth, sHeight);
+                    DrawTexturePro(groundTexture, groundSourceRect, groundDistRect, GetVector2(sWidth / 2.0f, sHeight / 2.0f), point->rotation, WHITE);
+
+                }
+
+                for (int i = 0; i < ArrayCount(mapGlyphs); i++)
+                {
+                    int x = i % mapWidth;
+                    int y = i / mapWidth;
+
+                    int wPx = gFontAtlas.glyphWidth;
+                    int hPx = gFontAtlas.glyphHeight;
+                    int xPx = x * wPx;
+                    int yPx = y * hPx;
+
+                    Rectangle glyphRect = GetRectangle((f32) xPx, (f32) yPx, (f32) wPx, (f32) hPx);
+                    if (mapGlyphs[i] == '#')
+                    {
+                        if (((y + 1) * mapWidth + x < mapWidth * mapHeight) &&
+                            (mapGlyphs[(y + 1) * mapWidth + x] == '#'))
+                        {
+                            wallSourceRect.y = 0 * wallSourceRect.height;
+                        }
+                        else
+                        {
+                            wallSourceRect.y = 1 * wallSourceRect.height;
+                        }
+
+                        DrawTexturePro(wallTexture, wallSourceRect, glyphRect, GetVector2(), 0.0f, WHITE);
+                    }
+                    else if (enemyHealths[i] > 0)
+                    {
+                        DrawGlyph(glyphRect, 9*16+1, RAYWHITE);
+                    }
+                    else if (mapGlyphs[i] != '.')
+                    {
+                        DrawGlyph(glyphRect, mapGlyphs[i], GetColor(255, 255, 255));
+                    }
+                }
+
+                Rectangle playerRect = GetRectangle((f32) gameState->playerX * gFontAtlas.glyphWidth,
+                                                    (f32) gameState->playerY * gFontAtlas.glyphHeight,
+                                                    (f32) gFontAtlas.glyphWidth,
+                                                    (f32) gFontAtlas.glyphHeight);
+
+                DrawGlyph(playerRect, '@', YELLOW);
+
+                DrawRectangle(-200, -200, 200, gFontAtlas.glyphHeight * mapHeight + 400, BLACK);
+                DrawRectangle(-200, -200, gFontAtlas.glyphWidth * mapWidth + 400, 200, BLACK);
+                DrawRectangle(gFontAtlas.glyphWidth * mapWidth, -200, 200, gFontAtlas.glyphHeight * mapHeight + 400, BLACK);
+                DrawRectangle(-200, gFontAtlas.glyphHeight * mapHeight, gFontAtlas.glyphWidth * mapWidth + 400, 200, BLACK);
+            EndMode2D();
+
+            Vector2 mouseWorldPos = GetScreenToWorld2D(GetMousePosition(), camera);
+            int mX = (int) mouseWorldPos.x / gFontAtlas.glyphWidth;
+            int mY = (int) mouseWorldPos.y / gFontAtlas.glyphHeight;
+
+            if (mX >= 0 && mX < mapWidth && mY >= 0 && mY < mapHeight)
             {
-                GroundSamplingPoint *point = groundSamplingPoints + i;
+                if (mapGlyphs[mY * mapWidth + mX] == '#')
+                {
+                    DrawTextEx(font, "Wall", GetVector2(20.0f, 20.0f), (float)font.baseSize, 2, WHITE);
+                }
+                else if (gameState->playerX == mX && gameState->playerY == mY)
+                {
+                    DrawTextEx(font, "Player", GetVector2(20.0f, 20.0f), (float)font.baseSize, 2, WHITE);
+                }
+                else if (enemyHealths[mY * mapWidth + mX] > 0)
+                {
+                    DrawTextEx(font, TextFormat("Sterling Ant at %d/%d HP", enemyHealths[mY * mapWidth + mX], 10), GetVector2(20.0f, 20.0f), (float)font.baseSize, 2, WHITE);
+                }
 
-                f32 ratio = groundSourceRect.width / groundSourceRect.height;
-                f32 area = point->area;
-
-                groundSourceRect.y = point->variant * groundSourceRect.height;
-
-                // Scaled
-                f32 sHeight = SqrtF(area / ratio) * 3.0f;
-                f32 sWidth = ratio * sHeight;
-
-                Rectangle groundDistRect = GetRectangle(point->x, point->y, sWidth, sHeight);
-
-                DrawTexturePro(groundTexture, groundSourceRect, groundDistRect, GetVector2(sWidth / 2.0f, sHeight / 2.0f), point->rotation, WHITE);
             }
-
-#if 0
-            // Draw colored quads
-            for (int i = 0; i < ArrayCount(groundSamplingPoints); i++)
-            {
-                GroundSamplingPoint *point = groundSamplingPoints + i;
-                f32 ratio = groundSourceRect.width / groundSourceRect.height;
-                f32 area = point->area;
-
-                groundSourceRect.y = point->variant * groundSourceRect.height;
-
-                // Scaled
-                f32 sHeight = SqrtF(area / ratio) * 3.0f;
-                f32 sWidth = ratio * sHeight;
-
-                Rectangle groundDistRect = GetRectangle(point->x, point->y, sWidth, sHeight);
-
-                DrawRectanglePro(groundDistRect, GetVector2(sWidth / 2.0f, sHeight / 2.0f), point->rotation, point->color);
-                f32 circleRadius = SqrtF(point->area / PI32);
-                DrawCircle((int) point->x, (int) point->y, circleRadius, point->color);
-            }
-
-            // Draw scaled circles
-            for (int i = 0; i < ArrayCount(groundSamplingPoints); i++)
-            {
-                GroundSamplingPoint *point = groundSamplingPoints + i;
-
-                f32 circleRadius = SqrtF(point->area / PI32);
-                DrawCircle((int) point->x, (int) point->y, circleRadius, point->color);
-            }
-
-            jcv_edge* edge = (jcv_edge *) jcv_diagram_get_edges(&diagram);
-            while(edge)
-            {
-                DrawLine((int) edge->pos[0].x, (int) edge->pos[0].y, (int) edge->pos[1].x, (int) edge->pos[1].y, WHITE);
-                edge = (jcv_edge *) jcv_diagram_get_next_edge(edge);
-            }
-#endif
 
 #if 0
             // Draw test atlas
@@ -244,12 +307,12 @@ int main(void)
             }
 #endif
 
-            DrawText(TextFormat("Voronoi relaxation iterations: %d", relaxIterations), 10, 10, 30, WHITE);
-
         EndDrawing();
     }
 
-    jcv_diagram_free(&diagram);
+    // UnloadMusicStream(music); 
+
+    // CloseAudioDevice();
 
     CloseWindow();
     
