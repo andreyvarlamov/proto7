@@ -292,6 +292,8 @@ int main(void)
 
             }
 
+            DrawFPS(5, 5);
+
 #if 0
             // Draw test atlas
             int glyphIndex = 0;
