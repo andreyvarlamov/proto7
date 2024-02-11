@@ -16,7 +16,7 @@ struct FontAtlas
     int glyphCount;
 };
 
-global_variable FontAtlas gFontAtlas;
+static_g FontAtlas gFontAtlas;
 
 void DrawGlyph(Rectangle destRect, int glyphIndex, Color color)
 {
@@ -61,7 +61,7 @@ int main(void)
 
     Music music = LoadMusicStream("resources/20240204 Calling.mp3");
 
-    PlayMusicStream(music);
+    // PlayMusicStream(music);
 
     gFontAtlas.texture = LoadTexture("resources/bloody_font.png");
     gFontAtlas.glyphWidth = 48;
@@ -73,10 +73,10 @@ int main(void)
     int glyphsPerRowOnScreen = (int) (screenWidth / destRect.width);
     int glyphsPerColumnOnScreen = (int) (screenHeight / destRect.height);
 
-    Texture2D groundTexture = LoadTexture("resources/GroundBrushes2.png");
-    int groundBrushVariants = 4;
+    Texture2D groundTexture = LoadTexture("resources/GroundBrushes3.png");
+    int groundBrushVariants = 3;
     SetTextureFilter(groundTexture, TEXTURE_FILTER_POINT);
-    Rectangle groundSourceRect = GetRectangle(64, 64);
+    Rectangle groundSourceRect = GetRectangle(32, 32);
 
     Texture2D wallTexture = LoadTexture("resources/small wall.png");
     SetTextureFilter(groundTexture, TEXTURE_FILTER_POINT);
@@ -84,11 +84,15 @@ int main(void)
 
     Font font = LoadFontEx("resources/LuxuriousRoman-Regular.ttf", 30, 0, 100);
 
+    Shader shader = LoadShader("resources/quad.vs", "resources/quad.fs");
+
     GameState gameStateData = {};
     GameState *gameState = &gameStateData;
 
     int mapWidth = MAP_WIDTH;
     int mapHeight = MAP_HEIGHT;
+
+#if 0
     u8 mapGlyphs[MAP_WIDTH * MAP_HEIGHT];
     for (int i = 0; i < ArrayCount(mapGlyphs); i++)
     {
@@ -100,6 +104,34 @@ int main(void)
 
         mapGlyphs[i] = isWall ? '#' : '.';
     }
+#else
+    u8 mapGlyphs[MAP_WIDTH * MAP_HEIGHT] = {
+        35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 
+        35, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 35, 
+        35, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 254, 46, 46, 46, 46, 46, 46, 35, 
+        35, 46, 46, 46, 254, 254, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 35, 
+        35, 46, 46, 46, 254, 254, 46, 46, 46, 46, 46, 46, 254, 46, 46, 46, 46, 46, 254, 254, 46, 46, 46, 35, 
+        35, 46, 46, 46, 254, 254, 254, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 254, 254, 46, 46, 46, 35, 
+        35, 46, 46, 46, 46, 254, 254, 254, 46, 46, 46, 46, 46, 46, 46, 46, 254, 254, 254, 254, 46, 46, 46, 35, 
+        35, 46, 254, 46, 46, 46, 254, 254, 46, 46, 46, 46, 46, 46, 254, 254, 254, 254, 254, 46, 46, 46, 46, 35, 
+        35, 46, 46, 46, 46, 254, 254, 254, 46, 46, 46, 46, 254, 254, 254, 254, 254, 254, 46, 46, 46, 46, 46, 35, 
+        35, 46, 46, 46, 46, 254, 254, 46, 46, 46, 46, 254, 254, 254, 254, 46, 46, 46, 46, 46, 46, 254, 46, 35, 
+        35, 46, 46, 46, 46, 254, 254, 254, 254, 254, 254, 254, 254, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 35, 
+        35, 46, 46, 46, 46, 254, 254, 254, 254, 254, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 35, 
+        35, 46, 46, 46, 46, 46, 46, 254, 254, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 35, 
+        35, 46, 46, 254, 46, 46, 46, 254, 254, 46, 46, 46, 46, 254, 46, 46, 46, 247, 46, 46, 46, 46, 46, 35, 
+        35, 46, 46, 46, 46, 46, 46, 254, 254, 46, 46, 46, 46, 46, 46, 46, 247, 247, 46, 46, 46, 46, 46, 35, 
+        35, 46, 46, 46, 46, 46, 46, 254, 254, 46, 46, 46, 46, 46, 46, 46, 247, 247, 46, 46, 46, 46, 46, 35, 
+        35, 46, 46, 46, 46, 46, 46, 46, 254, 254, 46, 254, 254, 46, 46, 247, 247, 247, 247, 46, 46, 46, 46, 35, 
+        35, 46, 46, 46, 46, 46, 46, 46, 254, 254, 254, 254, 254, 46, 247, 247, 247, 247, 247, 247, 46, 46, 46, 35, 
+        35, 46, 254, 46, 46, 46, 46, 46, 254, 254, 254, 254, 46, 46, 247, 247, 247, 247, 247, 247, 247, 46, 46, 35, 
+        35, 46, 46, 46, 46, 46, 46, 46, 254, 254, 46, 46, 46, 46, 46, 247, 247, 247, 247, 247, 247, 46, 46, 35, 
+        35, 46, 46, 46, 254, 254, 254, 254, 254, 46, 46, 254, 46, 46, 46, 46, 46, 247, 247, 247, 46, 46, 46, 35, 
+        35, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 247, 247, 247, 46, 35, 
+        35, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 35, 
+        35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 
+    };
+#endif
 
     int enemyHealths[MAP_WIDTH * MAP_HEIGHT] = {};
     for (int i = 0; i < ArrayCount(mapGlyphs); i++)
@@ -121,7 +153,28 @@ int main(void)
     {
         GroundPoint *point = groundPoints + i;
 
-        point->variant = GetRandomValue(0, groundBrushVariants - 1);
+        point->variant = 0;
+
+        switch (mapGlyphs[i])
+        {
+            case 35, 46:
+            {
+                point->variant = 0;
+            } break;
+
+            case 254:
+            {
+                point->variant = 1;
+            } break;
+
+            case 247:
+            {
+                point->variant = 2;
+            } break;
+
+            default: break;
+        }
+
         point->scale = 1.0f + GetRandomValue(0, 255) / 1024.0f;
 
         int x = i % mapWidth;
@@ -130,15 +183,15 @@ int main(void)
         f32 xPx = (f32) x * gFontAtlas.glyphWidth + gFontAtlas.glyphWidth / 2.0f;
         f32 yPx = (f32) y * gFontAtlas.glyphHeight + gFontAtlas.glyphHeight / 2.0f;
 
-        f32 offsetXPct = GetRandomValue(0, 1000) / 10000.0f - 0.05f; // [-0.05, 0.05]
-        f32 offsetYPct = GetRandomValue(0, 1000) / 10000.0f - 0.05f;
+        f32 offsetXPct = 0;// GetRandomValue(0, 1000) / 10000.0f - 0.05f; // [-0.05, 0.05]
+        f32 offsetYPct = 0;// GetRandomValue(0, 1000) / 10000.0f - 0.05f;
 
         xPx += offsetXPct * gFontAtlas.glyphWidth;
         yPx += offsetYPct * gFontAtlas.glyphHeight;
 
         point->pxPos = GetVector2(xPx, yPx);
 
-        point->rotation = (f32) GetRandomValue(0, 359);
+        point->rotation = 0; //(f32) GetRandomValue(0, 359);
     }
 
     gameState->playerX = 1;
@@ -195,12 +248,104 @@ int main(void)
                                        gameState->playerY * gFontAtlas.glyphHeight + gFontAtlas.glyphHeight / 2.0f);
         }
 
+        static_p u8 c1 = 26;
+        static_p u8 a1 = 00;//56;
+        static_p u8 c2 = 26;
+        static_p u8 a2 = 190;//56;
+
+        u8 *toC = &c1;
+        u8 *toA = &a1;
+
+        if (IsKeyDown(KEY_LEFT_SHIFT))
+        {
+            toC = &c2;
+            toA = &a2;
+        }
+
+        u8 *toInc = toC;
+
+        if (IsKeyDown(KEY_LEFT_CONTROL))
+        {
+            toInc = toA;
+        }
+
+        if (IsKeyPressed(KEY_UP))
+        {
+            *toInc += 10;
+        }
+        if (IsKeyPressed(KEY_DOWN))
+        {
+            *toInc -= 10;
+        }
+
         // Draw
         BeginDrawing();
+        {
             ClearBackground(BLACK);
 
             BeginMode2D(camera);
+            {
+                BeginShaderMode(shader);
+                {
+                    // NOTE: Draw map floor brushes
+                    // for (int i = 0; i < ArrayCount(mapGlyphs); i++)
+                    for (int i = 128; i < 129; i++)
+                    {
+                        GroundPoint *point = groundPoints + i;
+                        groundSourceRect.y = point->variant * groundSourceRect.height;
 
+                        if (point->variant == 0)
+                        {
+                            int x = i % mapWidth;
+                            int y = i / mapWidth;
+
+                            int wPx = gFontAtlas.glyphWidth;
+                            int hPx = gFontAtlas.glyphHeight;
+                            int xPx = x * wPx;
+                            int yPx = y * hPx;
+
+                            f32 baseScale = 1.0f;
+                            f32 sWidth = groundSourceRect.width * baseScale * point->scale;
+                            f32 sHeight = groundSourceRect.height * baseScale * point->scale;
+                            Rectangle groundDistRect = GetRectangle(point->pxPos.x, point->pxPos.y, sWidth, sHeight);
+
+                            int screenOffsetLoc = GetShaderLocation(shader, "offset");
+                            float screenOffset[] = { point->pxPos.x + sWidth / 2.0f, point->pxPos.y + sHeight / 2.0f, 0.0f, 0.0f };
+                            SetShaderValue(shader, screenOffsetLoc, screenOffset, SHADER_UNIFORM_VEC3);
+
+                            DrawTexturePro(groundTexture, groundSourceRect, groundDistRect, GetVector2(sWidth / 2.0f, sHeight / 2.0f), point->rotation, WHITE);
+                        }
+                    }
+
+                    // for (int i = 0; i < ArrayCount(mapGlyphs); i++)
+                    for (int i = 128; i < 129; i++)
+                    {
+                        GroundPoint *point = groundPoints + i;
+                        groundSourceRect.y = point->variant * groundSourceRect.height;
+
+                        if (point->variant != 0)
+                        {
+                            int x = i % mapWidth;
+                            int y = i / mapWidth;
+
+                            int wPx = gFontAtlas.glyphWidth;
+                            int hPx = gFontAtlas.glyphHeight;
+                            int xPx = x * wPx;
+                            int yPx = y * hPx;
+
+                            f32 baseScale = 1.0f;
+                            f32 sWidth = groundSourceRect.width * baseScale * point->scale;
+                            f32 sHeight = groundSourceRect.height * baseScale * point->scale;
+                            Rectangle groundDistRect = GetRectangle(point->pxPos.x, point->pxPos.y, sWidth, sHeight);
+                            DrawTexturePro(groundTexture, groundSourceRect, groundDistRect, GetVector2(sWidth / 2.0f, sHeight / 2.0f), point->rotation, WHITE);
+                        }
+                    }
+                }
+                EndShaderMode();
+
+                // NOTE: Draw checkerboard
+                Color col1 = GetColor(c1, c1, c1, a1);
+                Color col2 = GetColor(c2, c2, c2, a2);
                 for (int i = 0; i < ArrayCount(mapGlyphs); i++)
                 {
                     int x = i % mapWidth;
@@ -211,18 +356,15 @@ int main(void)
                     int xPx = x * wPx;
                     int yPx = y * hPx;
 
-                    // DrawRectangle(xPx, yPx, wPx, hPx, testColors[i]);
-                    
-                    GroundPoint *point = groundPoints + i;
-                    groundSourceRect.y = point->variant * groundSourceRect.height;
-                    f32 baseScale = 5.0f;
-                    f32 sWidth = groundSourceRect.width * baseScale * point->scale;
-                    f32 sHeight = groundSourceRect.height * baseScale * point->scale;
-                    Rectangle groundDistRect = GetRectangle(point->pxPos.x, point->pxPos.y, sWidth, sHeight);
-                    DrawTexturePro(groundTexture, groundSourceRect, groundDistRect, GetVector2(sWidth / 2.0f, sHeight / 2.0f), point->rotation, WHITE);
+                    Color col = ((((x + y) % 2) == 0) ? col1 : col2);
 
+                    if (i == 128) { col.r = 255; col.a = 50; }
+
+                    DrawRectangle(xPx, yPx, wPx, hPx, col);
                 }
-
+#if 1
+                
+                // Draw map walls
                 for (int i = 0; i < ArrayCount(mapGlyphs); i++)
                 {
                     int x = i % mapWidth;
@@ -252,12 +394,14 @@ int main(void)
                     {
                         DrawGlyph(glyphRect, 9*16+1, RAYWHITE);
                     }
-                    else if (mapGlyphs[i] != '.')
+                    else if (mapGlyphs[i] != '.' && mapGlyphs[i] !=  254 && mapGlyphs[i] != 247)
                     {
                         DrawGlyph(glyphRect, mapGlyphs[i], GetColor(255, 255, 255));
                     }
                 }
+#endif
 
+                // Draw player
                 Rectangle playerRect = GetRectangle((f32) gameState->playerX * gFontAtlas.glyphWidth,
                                                     (f32) gameState->playerY * gFontAtlas.glyphHeight,
                                                     (f32) gFontAtlas.glyphWidth,
@@ -269,6 +413,7 @@ int main(void)
                 DrawRectangle(-200, -200, gFontAtlas.glyphWidth * mapWidth + 400, 200, BLACK);
                 DrawRectangle(gFontAtlas.glyphWidth * mapWidth, -200, 200, gFontAtlas.glyphHeight * mapHeight + 400, BLACK);
                 DrawRectangle(-200, gFontAtlas.glyphHeight * mapHeight, gFontAtlas.glyphWidth * mapWidth + 400, 200, BLACK);
+            }
             EndMode2D();
 
             Vector2 mouseWorldPos = GetScreenToWorld2D(GetMousePosition(), camera);
@@ -294,6 +439,9 @@ int main(void)
 
             DrawFPS(5, 5);
 
+            DrawTextEx(font, TextFormat("C1: (%d,%d,%d,%d)", c1, c1, c1, a1), GetVector2(5.0f, 100.0f), (float)font.baseSize, 2, WHITE);
+            DrawTextEx(font, TextFormat("C2: (%d,%d,%d,%d)", c2, c2, c2, a2), GetVector2(5.0f, 130.0f), (float)font.baseSize, 2, WHITE);
+
 #if 0
             // Draw test atlas
             int glyphIndex = 0;
@@ -308,7 +456,7 @@ int main(void)
                 }
             }
 #endif
-
+        }
         EndDrawing();
     }
 

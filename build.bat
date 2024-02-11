@@ -1,34 +1,58 @@
-@ECHO OFF
+@echo off
 
-SETLOCAL
+setlocal
 
-set CommonLibDir=C:\dev\shared\libs
-set CommonIncludeDir=C:\dev\shared\include
+set libsdir=C:\dev\shared\libs
+set incdir=C:\dev\shared\include
 
-set RootDir=%CurrProjDir:~0,-1%
+set rootdir=%~dp0
+set bindir=%rootdir%build
+set srcdir=%rootdir%source
 
-set BuildDir=%RootDir%\build
-set SourceDir=%RootDir%\source
+rem Compiler Options
+    rem /MDd -- Causes the application to use the multithread-specific and DLL-specific version of the run-time library
+    rem /nologo
+    rem /FC -- Output full path of files in compiler diagnostics
+    rem /GR- -- Disable runtime type information
+    rem /Z7 -- Produce full-symbolic debugging information in the .obj files using CodeView format
+    rem /Od -- Turn off all optimizations
+    rem /Oi -- Generate intrinsic functions
+set copt=/I%incdir% /MDd /nologo /FC /GR- /Z7 /Od /Oi
 
-set CompilerOptions=/I%CommonIncludeDir% /MTd /nologo /FC /GR- /Z7 /EHa- /Od /Oi
+rem Compiler Warning Options
+    rem /WX -- treat warnings as errors
+    rem /W4 -- level 4 warnings
+    rem disable the following warnings:
+    rem /wd4201 -- nonstandard extension used : nameless struct/union
+    rem /wd4100 -- unreferenced formal parameter
+    rem /wd4189 -- unreferenced local variablel
+    rem /wd4505 -- unreferenced function
+    rem Maybe try not to disable those
+    rem /wd4996 -- using deprecated functions like fopen, not fopen_s
+    rem /wd4456 -- hiding previous declaration (to compile with raygui.h)
+    rem /wd4267 -- conversion with possible loss of data - from size_t
+    rem /wd4127 -- conditional expression is constant
+set cwopt=/WX /W4 /wd4201 /wd4100 /wd4189 /wd4505 /wd4127
 
-REM warnings that maybe shouldn't be disabled:
-    REM 4996 (using deprecated functions like fopen, not fopen_s),
-    REM 4456 (to compile with raygui.h -- hiding previous declaration)
-    REM 4267 (to compile with raygui.h -- conversion with possible loss of data - from size_t)
-set CompilerWarningOptions=/WX /W4 /wd4201 /wd4100 /wd4189 /wd4505 /wd4996 /wd4456 /wd4267
+rem Linker options
+    rem /libpath
+    rem /debug -- generate final 
+    rem /incremental:no
+    rem /opt:ref -- linker optimization: remove unreferenced functions and data ("comdats") -- mostly to reduce size of exe due to crt
+    rem /subsystem:console
+    rem /verbose
+set lopt=/libpath:%libsdir% /debug /opt:ref /incremental:no /subsystem:console
 
-set LinkOptions=/LIBPATH:%CommonLibDir% /INCREMENTAL:NO /OPT:REF /SUBSYSTEM:CONSOLE
-set LinkLibs=raylibdll.lib raylib.lib
+rem Link against libs:
+    rem SDL simple -- SDL2main.lib SDL2.lib SDL2_image.lib SDL2_ttf.lib shell32.lib
+    rem SDL opengl assimp -- SDL2main.lib SDL2.lib SDL2_image.lib SDL2_ttf.lib glad.lib opengl32.lib shell32.lib assimp-vc143-mtd.lib
+    rem Raylib -- raylibdll.lib raylib.lib
+set llib=raylibdll.lib raylib.lib
 
-pushd %BuildDir%
+pushd %bindir%
 
-cl %SourceDir%\proto7.cpp %CompilerOptions% %CompilerWarningOptions% /link %LinkOptions% %LinkLibs%
+cl %srcdir%\proto7.cpp %copt% %cwopt% /link %llib% %lopt%
 
 popd
 
-if %ERRORLEVEL% NEQ 0 (
-    exit %ERRORLEVEL%
-)
-
-ENDLOCAL
+if %errorlevel% neq 0 (exit /b %errorlevel%)
