@@ -53,6 +53,31 @@ struct GroundPoint
     f32 depth;
 };
 
+struct SortEntry
+{
+    f32 sortKey;
+    int index;
+};
+
+void BubbleSort(SortEntry *entries, int count)
+{
+    for (int i = 0; i < count; i++)
+    {
+        for (int j = 0; j < (count - 1); j++)
+        {
+            SortEntry *entryA = entries + j;
+            SortEntry *entryB = entries + j + 1;
+
+            if (entryA->sortKey < entryB->sortKey)
+            {
+                SortEntry swap = *entryB;
+                *entryB = *entryA;
+                *entryA = swap;
+            }
+        }
+    }
+}
+
 int main(void)
 {
     int screenWidth = 1920;
@@ -194,10 +219,29 @@ int main(void)
 
         point->pxPos = GetVector2(xPx, yPx);
 
+#if 0
+        if (mapGlyphs[i] == 35 || mapGlyphs[i] == 46)
+        {
+            point->depth = GetRandomValue(0, 10000) / 20000.0f + 0.5f;
+        }
+        else
+        {
+            point->depth = GetRandomValue(0, 10000) / 20000.0f;
+        }
+#else
         point->depth = GetRandomValue(0, 10000) / 10000.0f;
-
+#endif
         point->rotation = 0; //(f32) GetRandomValue(0, 359);
     }
+        
+    SortEntry sortBuffer[MAP_WIDTH * MAP_HEIGHT];
+    for (int i = 0; i < ArrayCount(mapGlyphs); i++)
+    {
+        sortBuffer[i].sortKey = groundPoints[i].depth;
+        sortBuffer[i].index = i;
+    }
+
+    BubbleSort(sortBuffer, ArrayCount(sortBuffer));
 
     f32 apronScale = 2.0f;
 
@@ -297,10 +341,10 @@ int main(void)
             {
                 {
                     // NOTE: Draw map floor brushes
-                    for (int i = 0; i < ArrayCount(mapGlyphs); i++)
+                    for (int i = 0; i < ArrayCount(sortBuffer); i++)
                     // for (int i = 128; i < 129; i++)
                     {
-                        GroundPoint *point = groundPoints + i;
+                        GroundPoint *point = groundPoints + sortBuffer[i].index;
                         groundSourceRect.y = point->variant * groundSourceRect.height;
 
                         f32 heightUV = 1.0f / groundBrushVariants;
@@ -317,7 +361,7 @@ int main(void)
                         rlEnableDepthTest();
                         SetShaderValue(shader, depthLoc, &point->depth, SHADER_UNIFORM_FLOAT);
 
-                        if (point->variant == 0)
+                        // if (point->variant == 0)
                         {
                             int x = i % mapWidth;
                             int y = i / mapWidth;
@@ -335,7 +379,7 @@ int main(void)
                         }
 
                         EndShaderMode();
-                                                rlDisableDepthTest();
+                        rlDisableDepthTest();
                     }
 
                     // for (int i = 0; i < ArrayCount(mapGlyphs); i++)
