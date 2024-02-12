@@ -106,9 +106,9 @@ int main(void)
     SetTextureFilter(groundTexture, TEXTURE_FILTER_POINT);
     Rectangle groundSourceRect = GetRectangle(32, 32);
 
-    Texture2D wallTexture = LoadTexture("resources/small wall.png");
+    Texture2D wallTexture = LoadTexture("resources/wall 2.png");
     SetTextureFilter(groundTexture, TEXTURE_FILTER_POINT);
-    Rectangle wallSourceRect = GetRectangle(24, 36);
+    Rectangle wallSourceRect = GetRectangle(36, 72);
 
     Font font = LoadFontEx("resources/LuxuriousRoman-Regular.ttf", 30, 0, 100);
 
