@@ -16,7 +16,7 @@ struct FontAtlas
     int glyphCount;
 };
 
-global_variable FontAtlas gFontAtlas;
+static_g FontAtlas gFontAtlas;
 
 void DrawGlyph(Rectangle destRect, int glyphIndex, Color color)
 {

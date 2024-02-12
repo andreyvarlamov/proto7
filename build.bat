@@ -5,7 +5,7 @@ SETLOCAL
 set CommonLibDir=C:\dev\shared\libs
 set CommonIncludeDir=C:\dev\shared\include
 
-set RootDir=%CurrProjDir:~0,-1%
+set RootDir=%~dp0
 
 set BuildDir=%RootDir%\build
 set SourceDir=%RootDir%\source
@@ -19,7 +19,7 @@ REM warnings that maybe shouldn't be disabled:
 set CompilerWarningOptions=/WX /W4 /wd4201 /wd4100 /wd4189 /wd4505 /wd4996 /wd4456 /wd4267
 
 set LinkOptions=/LIBPATH:%CommonLibDir% /INCREMENTAL:NO /OPT:REF /SUBSYSTEM:CONSOLE
-set LinkLibs=raylibdll.lib raylib.lib
+set LinkLibs=raylib.lib
 
 pushd %BuildDir%
 
