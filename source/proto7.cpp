@@ -4,6 +4,7 @@
 
 #include <raylib/raylib.h>
 #include <raylib/raymath.h>
+#include <raylib/rlgl.h>
 
 #include <varand/varand_util.h>
 
@@ -48,6 +49,8 @@ struct GroundPoint
     int variant;
 
     f32 rotation;
+
+    f32 depth;
 };
 
 int main(void)
@@ -73,7 +76,7 @@ int main(void)
     int glyphsPerRowOnScreen = (int) (screenWidth / destRect.width);
     int glyphsPerColumnOnScreen = (int) (screenHeight / destRect.height);
 
-    Texture2D groundTexture = LoadTexture("resources/GroundBrushes3.png");
+    Texture2D groundTexture = LoadTexture("resources/GroundBrushes4.png");
     int groundBrushVariants = 3;
     SetTextureFilter(groundTexture, TEXTURE_FILTER_POINT);
     Rectangle groundSourceRect = GetRectangle(32, 32);
@@ -191,9 +194,16 @@ int main(void)
 
         point->pxPos = GetVector2(xPx, yPx);
 
+        point->depth = GetRandomValue(0, 10000) / 10000.0f;
+
         point->rotation = 0; //(f32) GetRandomValue(0, 359);
     }
 
+    f32 apronScale = 2.0f;
+
+    int apronScaleLoc = GetShaderLocation(shader, "apronScale");
+    SetShaderValue(shader, apronScaleLoc, &apronScale, SHADER_UNIFORM_FLOAT);
+    
     gameState->playerX = 1;
     gameState->playerY = 1;
 
@@ -248,10 +258,10 @@ int main(void)
                                        gameState->playerY * gFontAtlas.glyphHeight + gFontAtlas.glyphHeight / 2.0f);
         }
 
-        static_p u8 c1 = 26;
-        static_p u8 a1 = 00;//56;
-        static_p u8 c2 = 26;
-        static_p u8 a2 = 190;//56;
+        static_p u8 c1 = 0;//26;
+        static_p u8 a1 = 0;//56;
+        static_p u8 c2 = 0;//26;
+        static_p u8 a2 = 0;//190;//56;
 
         u8 *toC = &c1;
         u8 *toA = &a1;
@@ -285,14 +295,27 @@ int main(void)
 
             BeginMode2D(camera);
             {
-                BeginShaderMode(shader);
                 {
                     // NOTE: Draw map floor brushes
-                    // for (int i = 0; i < ArrayCount(mapGlyphs); i++)
-                    for (int i = 128; i < 129; i++)
+                    for (int i = 0; i < ArrayCount(mapGlyphs); i++)
+                    // for (int i = 128; i < 129; i++)
                     {
                         GroundPoint *point = groundPoints + i;
                         groundSourceRect.y = point->variant * groundSourceRect.height;
+
+                        f32 heightUV = 1.0f / groundBrushVariants;
+                        f32 minYUV = heightUV * point->variant;
+
+                        int minYUVLoc = GetShaderLocation(shader, "minYUV");
+                        SetShaderValue(shader, minYUVLoc, &minYUV, SHADER_UNIFORM_FLOAT);
+                        int heightUVLoc = GetShaderLocation(shader, "heightUV");
+                        SetShaderValue(shader, heightUVLoc, &heightUV, SHADER_UNIFORM_FLOAT);
+
+                        // float depth = -1.0f;
+                        int depthLoc = GetShaderLocation(shader, "depth");
+                        BeginShaderMode(shader);
+                        rlEnableDepthTest();
+                        SetShaderValue(shader, depthLoc, &point->depth, SHADER_UNIFORM_FLOAT);
 
                         if (point->variant == 0)
                         {
@@ -304,44 +327,41 @@ int main(void)
                             int xPx = x * wPx;
                             int yPx = y * hPx;
 
-                            f32 baseScale = 1.0f;
-                            f32 sWidth = groundSourceRect.width * baseScale * point->scale;
-                            f32 sHeight = groundSourceRect.height * baseScale * point->scale;
+                            f32 sWidth = gFontAtlas.glyphWidth * apronScale;
+                            f32 sHeight = gFontAtlas.glyphHeight * apronScale;
                             Rectangle groundDistRect = GetRectangle(point->pxPos.x, point->pxPos.y, sWidth, sHeight);
-
-                            int screenOffsetLoc = GetShaderLocation(shader, "offset");
-                            float screenOffset[] = { point->pxPos.x + sWidth / 2.0f, point->pxPos.y + sHeight / 2.0f, 0.0f, 0.0f };
-                            SetShaderValue(shader, screenOffsetLoc, screenOffset, SHADER_UNIFORM_VEC3);
 
                             DrawTexturePro(groundTexture, groundSourceRect, groundDistRect, GetVector2(sWidth / 2.0f, sHeight / 2.0f), point->rotation, WHITE);
                         }
+
+                        EndShaderMode();
+                                                rlDisableDepthTest();
                     }
 
                     // for (int i = 0; i < ArrayCount(mapGlyphs); i++)
-                    for (int i = 128; i < 129; i++)
-                    {
-                        GroundPoint *point = groundPoints + i;
-                        groundSourceRect.y = point->variant * groundSourceRect.height;
+                    // for (int i = 128; i < 129; i++)
+                    // {
+                    //     GroundPoint *point = groundPoints + i;
+                    //     groundSourceRect.y = point->variant * groundSourceRect.height;
 
-                        if (point->variant != 0)
-                        {
-                            int x = i % mapWidth;
-                            int y = i / mapWidth;
+                    //     if (point->variant != 0)
+                    //     {
+                    //         int x = i % mapWidth;
+                    //         int y = i / mapWidth;
 
-                            int wPx = gFontAtlas.glyphWidth;
-                            int hPx = gFontAtlas.glyphHeight;
-                            int xPx = x * wPx;
-                            int yPx = y * hPx;
+                    //         int wPx = gFontAtlas.glyphWidth;
+                    //         int hPx = gFontAtlas.glyphHeight;
+                    //         int xPx = x * wPx;
+                    //         int yPx = y * hPx;
 
-                            f32 baseScale = 1.0f;
-                            f32 sWidth = groundSourceRect.width * baseScale * point->scale;
-                            f32 sHeight = groundSourceRect.height * baseScale * point->scale;
-                            Rectangle groundDistRect = GetRectangle(point->pxPos.x, point->pxPos.y, sWidth, sHeight);
-                            DrawTexturePro(groundTexture, groundSourceRect, groundDistRect, GetVector2(sWidth / 2.0f, sHeight / 2.0f), point->rotation, WHITE);
-                        }
-                    }
+                    //         f32 baseScale = 1.0f;
+                    //         f32 sWidth = groundSourceRect.width * baseScale * point->scale;
+                    //         f32 sHeight = groundSourceRect.height * baseScale * point->scale;
+                    //         Rectangle groundDistRect = GetRectangle(point->pxPos.x, point->pxPos.y, sWidth, sHeight);
+                    //         DrawTexturePro(groundTexture, groundSourceRect, groundDistRect, GetVector2(sWidth / 2.0f, sHeight / 2.0f), point->rotation, WHITE);
+                    //     }
+                    // }
                 }
-                EndShaderMode();
 
                 // NOTE: Draw checkerboard
                 Color col1 = GetColor(c1, c1, c1, a1);
